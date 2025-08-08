@@ -1331,15 +1331,24 @@ ${itemList}
             if (settings.defaultMinStock) document.getElementById('defaultMinStock').value = settings.defaultMinStock;
         }
 
-        function testConnection() {
+        async function testConnection() {
             const gasUrl = document.getElementById('gasUrl').value;
             if (!gasUrl) {
                 alert('กรุณากรอก Google Apps Script URL');
                 return;
             }
-            
-            // จำลองการทดสอบการเชื่อมต่อ
-            alert('การเชื่อมต่อสำเร็จ');
+
+            try {
+                await fetch(gasUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'ping' })
+                });
+                alert('การเชื่อมต่อสำเร็จ');
+            } catch (error) {
+                alert('การเชื่อมต่อล้มเหลว');
+                console.error(error);
+            }
         }
 
         // === Google Apps Script Integration ===
@@ -1349,26 +1358,51 @@ ${itemList}
                 console.log('No Google Apps Script URL configured');
                 return;
             }
-            
-            // ส่งข้อมูลไป Google Sheets
+
             const data = {
                 action: 'sync',
+                sheetId: settings.sheetId,
                 inventory: inventory,
                 sales: sales
             };
-            
+
             fetch(settings.gasUrl, {
                 method: 'POST',
-                mode: 'no-cors',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)
-            }).then(() => {
+            })
+            .then(res => res.text())
+            .then(() => {
                 console.log('Synced with Google Sheets');
-            }).catch(error => {
+            })
+            .catch(error => {
                 console.error('Sync failed:', error);
             });
+        }
+
+        async function loadDataFromGoogleSheets() {
+            if (!settings.gasUrl || !settings.sheetId) {
+                return;
+            }
+
+            try {
+                const response = await fetch(settings.gasUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'getData', sheetId: settings.sheetId })
+                });
+                const data = await response.json();
+                if (data.inventory) {
+                    inventory = data.inventory;
+                    localStorage.setItem('pos_inventory', JSON.stringify(inventory));
+                }
+                if (data.sales) {
+                    sales = data.sales;
+                    localStorage.setItem('pos_sales', JSON.stringify(sales));
+                }
+            } catch (error) {
+                console.error('Load failed:', error);
+            }
         }
 
         // Auto-sync ทุก 5 นาที
@@ -1376,8 +1410,9 @@ ${itemList}
 
         // === เริ่มต้นระบบ ===
         
-        function initializeSystem() {
+        async function initializeSystem() {
             loadSettings();
+            await loadDataFromGoogleSheets();
             loadProductsForSell();
             loadReports();
             
@@ -1667,8 +1702,8 @@ ${itemList}
         });
 
         // เริ่มต้นระบบเมื่อโหลดหน้าเว็บ
-        document.addEventListener('DOMContentLoaded', function() {
-            initializeSystem();
+        document.addEventListener('DOMContentLoaded', async function() {
+            await initializeSystem();
             
             // แสดงคำแนะนำการใช้งานครั้งแรก
             const firstTime = localStorage.getItem('pos_first_time');
