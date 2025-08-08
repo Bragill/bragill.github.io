@@ -379,6 +379,12 @@
         .hidden {
             display: none !important;
         }
+
+        .last-save {
+            text-align: center;
+            margin: 20px 0;
+            color: #fff;
+        }
     </style>
 </head>
 <body>
@@ -403,7 +409,10 @@
                     <h3>🔍 ค้นหาสินค้า</h3>
                     <div class="form-group">
                         <label>สแกนบาร์โค้ด / ค้นหาสินค้า</label>
-                        <input type="text" id="searchProduct" class="form-control" placeholder="สแกนหรือพิมพ์ชื่อสินค้า">
+                        <div style="display: flex; gap: 5px;">
+                            <input type="text" id="searchProduct" class="form-control" placeholder="สแกนหรือพิมพ์ชื่อสินค้า">
+                            <button type="button" class="btn btn-success" onclick="startBarcodeScanner()">📷</button>
+                        </div>
                     </div>
                     <div class="form-group">
                         <label>เลือกสินค้า</label>
@@ -613,6 +622,8 @@
         </div>
     </div>
 
+    <div id="lastSaved" class="last-save"></div>
+
     <!-- Modal สำหรับใบเสนอราคา -->
     <div id="invoiceModal" class="modal">
         <div class="modal-content">
@@ -794,20 +805,37 @@
                 alert('ตะกร้าสินค้าว่าง');
                 return;
             }
-            
-            const received = parseFloat(document.getElementById('receivedAmount').value) || 0;
+
+            const receivedField = document.getElementById('receivedAmount');
+            const receivedStr = receivedField.value.trim();
             const total = cart.reduce((sum, item) => sum + (item.sellPrice * item.quantity), 0);
-            
+
+            if (receivedStr === '') {
+                const sale = {
+                    id: Date.now(),
+                    date: new Date().toISOString(),
+                    items: [...cart],
+                    total: total,
+                    received: 0,
+                    change: total,
+                    profit: cart.reduce((sum, item) => sum + ((item.sellPrice - item.costPrice) * item.quantity), 0)
+                };
+                showInvoice(sale);
+                return;
+            }
+
+            const received = parseFloat(receivedStr) || 0;
+
             if (received < total) {
                 alert('เงินที่รับไม่เพียงพอ');
                 return;
             }
-            
+
             // ลดสต๊อก
             cart.forEach(cartItem => {
                 inventory[cartItem.productIndex].quantity -= cartItem.quantity;
             });
-            
+
             // บันทึกการขาย
             const sale = {
                 id: Date.now(),
@@ -818,16 +846,16 @@
                 change: received - total,
                 profit: cart.reduce((sum, item) => sum + ((item.sellPrice - item.costPrice) * item.quantity), 0)
             };
-            
+
             sales.push(sale);
-            
+
             // บันทึกข้อมูล
             localStorage.setItem('pos_inventory', JSON.stringify(inventory));
             localStorage.setItem('pos_sales', JSON.stringify(sales));
-            
+
             // แสดงใบเสนอราคา
             showInvoice(sale);
-            
+
             // ล้างตะกร้า
             clearCart();
             loadProductsForSell(); // อัพเดตรายการสินค้า
@@ -838,7 +866,7 @@
             const modal = document.getElementById('invoiceModal');
             const invoiceContent = document.getElementById('invoiceContent');
             const storeName = settings.storeName || 'ร้านค้าของฉัน';
-            
+
             let itemsHtml = '';
             sale.items.forEach(item => {
                 const itemTotal = item.sellPrice * item.quantity;
@@ -849,12 +877,26 @@
                     </div>
                 `;
             });
-            
+
+            const paymentHtml = sale.received < sale.total
+                ? `<div class="invoice-item">
+                        <span>ยอดค้างชำระ</span>
+                        <span>฿${(sale.total - sale.received).toLocaleString()}</span>
+                   </div>`
+                : `<div class="invoice-item">
+                        <span>รับเงิน</span>
+                        <span>฿${sale.received.toLocaleString()}</span>
+                   </div>
+                   <div class="invoice-item">
+                        <span>เงินทอน</span>
+                        <span>฿${sale.change.toLocaleString()}</span>
+                   </div>`;
+
             invoiceContent.innerHTML = `
                 <div class="invoice">
                     <div class="invoice-header">
                         <h2>${storeName}</h2>
-                        <p>ใบเสนอราคา #${sale.id}</p>
+                        <p>${sale.received < sale.total ? 'ใบ PR' : 'ใบเสนอราคา'} #${sale.id}</p>
                         <p>${new Date(sale.date).toLocaleString('th-TH')}</p>
                     </div>
                     ${itemsHtml}
@@ -862,14 +904,7 @@
                         <span>รวมทั้งหมด</span>
                         <span>฿${sale.total.toLocaleString()}</span>
                     </div>
-                    <div class="invoice-item">
-                        <span>รับเงิน</span>
-                        <span>฿${sale.received.toLocaleString()}</span>
-                    </div>
-                    <div class="invoice-item">
-                        <span>เงินทอน</span>
-                        <span>฿${sale.change.toLocaleString()}</span>
-                    </div>
+                    ${paymentHtml}
                 </div>
             `;
             
@@ -1235,14 +1270,28 @@
                             <p><strong>รายการ:</strong> ${sale.items.length} รายการ</p>
                             <p><strong>ยอดขาย:</strong> ฿${sale.total.toLocaleString()}</p>
                             <p><strong>กำไร:</strong> ฿${sale.profit.toLocaleString()}</p>
+                            <button class="btn btn-danger" onclick="confirmDeleteSale(${sale.id})">ลบ</button>
                         </div>
                     `).join('')}
                 </div>
             `;
         }
 
+        function confirmDeleteSale(id) {
+            const input = prompt('ใส่รหัสยืนยัน (DDMM):');
+            const now = new Date();
+            const code = now.getDate().toString().padStart(2, '0') + (now.getMonth() + 1).toString().padStart(2, '0');
+            if (input === code) {
+                sales = sales.filter(s => s.id !== id);
+                localStorage.setItem('pos_sales', JSON.stringify(sales));
+                generateReport();
+            } else {
+                alert('รหัสยืนยันไม่ถูกต้อง');
+            }
+        }
+
         // === LINE Notify ===
-        
+
         function sendLineNotify() {
             if (!settings.lineToken) {
                 alert('กรุณาตั้งค่า LINE Token ก่อน');
@@ -1454,13 +1503,13 @@ ${itemList}
         // === Camera Scanner (Optional Enhancement) ===
         
         let cameraStream = null;
-        
+
         function startBarcodeScanner() {
-            if (!navigator.mediaDevices) {
-                alert('เบราว์เซอร์ไม่รองรับการใช้กล้อง');
+            if (!navigator.mediaDevices || !('BarcodeDetector' in window)) {
+                alert('เบราว์เซอร์ไม่รองรับการสแกนบาร์โค้ดด้วยกล้อง');
                 return;
             }
-            
+
             const scannerContainer = document.createElement('div');
             scannerContainer.className = 'scanner-container';
             scannerContainer.innerHTML = `
@@ -1469,26 +1518,41 @@ ${itemList}
                 <br>
                 <button class="btn btn-danger" onclick="stopBarcodeScanner()">หยุดสแกน</button>
             `;
-            
+
             document.querySelector('.tab-content.active').appendChild(scannerContainer);
-            
-            navigator.mediaDevices.getUserMedia({ 
-                video: { 
-                    facingMode: 'environment' // ใช้กล้องหลัง
-                } 
+
+            navigator.mediaDevices.getUserMedia({
+                video: {
+                    facingMode: 'environment'
+                }
             })
             .then(stream => {
                 cameraStream = stream;
-                document.getElementById('scannerVideo').srcObject = stream;
-                
-                // จำลองการสแกน (ในการใช้งานจริงควรใช้ library อย่าง QuaggaJS)
-                setTimeout(() => {
-                    const mockBarcode = '8850006111101'; // ข้อมูลจำลอง
-                    document.getElementById('searchProduct').value = mockBarcode;
-                    document.getElementById('searchProduct').dispatchEvent(new Event('input'));
-                    stopBarcodeScanner();
-                    alert('สแกนบาร์โค้ดสำเร็จ: ' + mockBarcode);
-                }, 3000);
+                const video = document.getElementById('scannerVideo');
+                video.srcObject = stream;
+
+                const detector = new BarcodeDetector({formats: ['code_128', 'ean_13', 'ean_8']});
+
+                const scanLoop = () => {
+                    detector.detect(video)
+                    .then(barcodes => {
+                        if (barcodes.length > 0) {
+                            const code = barcodes[0].rawValue;
+                            document.getElementById('searchProduct').value = code;
+                            document.getElementById('searchProduct').dispatchEvent(new Event('input'));
+                            stopBarcodeScanner();
+                            alert('สแกนบาร์โค้ดสำเร็จ: ' + code);
+                            return;
+                        }
+                        requestAnimationFrame(scanLoop);
+                    })
+                    .catch(err => {
+                        console.error('Detect error:', err);
+                        requestAnimationFrame(scanLoop);
+                    });
+                };
+
+                requestAnimationFrame(scanLoop);
             })
             .catch(error => {
                 console.error('Camera access denied:', error);
@@ -1679,7 +1743,7 @@ ${itemList}
 
 ⌨️ คีย์ลัด:
 F1 = ขายสินค้า
-F2 = รับสินค้า  
+F2 = รับสินค้า
 F3 = สินค้าคงคลัง
 F4 = รายงาน
 
@@ -1688,6 +1752,8 @@ F4 = รายงาน
                     localStorage.setItem('pos_first_time', 'true');
                 }, 1000);
             }
+
+            updateLastSaveDisplay();
         });
 
         // === Offline Support ===
@@ -1711,7 +1777,7 @@ F4 = รายงาน
         
         window.addEventListener('offline', function() {
             console.log('ออฟไลน์ - ข้อมูลจะถูกบันทึกใน Local Storage');
-            
+
             const notification = document.createElement('div');
             notification.className = 'alert alert-warning';
             notification.textContent = '🟡 ออฟไลน์ - ข้อมูลบันทึกในเครื่อง';
@@ -1719,19 +1785,29 @@ F4 = รายงาน
             notification.style.top = '20px';
             notification.style.right = '20px';
             notification.style.zIndex = '1000';
-            
+
             document.body.appendChild(notification);
             setTimeout(() => notification.remove(), 3000);
         });
 
         // === Auto-save ===
-        
+
         // บันทึกข้อมูลอัตโนมัติทุกครั้งที่มีการเปลี่ยนแปลง
+        function updateLastSaveDisplay() {
+            const last = localStorage.getItem('pos_last_save');
+            const el = document.getElementById('lastSaved');
+            if (el) {
+                el.textContent = last ? `🕒 บันทึกล่าสุด: ${new Date(last).toLocaleString()}` : '';
+            }
+        }
+
         function autoSave() {
             localStorage.setItem('pos_inventory', JSON.stringify(inventory));
             localStorage.setItem('pos_sales', JSON.stringify(sales));
             localStorage.setItem('pos_settings', JSON.stringify(settings));
-            localStorage.setItem('pos_last_save', new Date().toISOString());
+            const now = new Date().toISOString();
+            localStorage.setItem('pos_last_save', now);
+            updateLastSaveDisplay();
         }
 
         // เรียก autoSave หลังจากทุกการดำเนินการสำคัญ
