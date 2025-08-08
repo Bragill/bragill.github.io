@@ -13,6 +13,9 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="POS System">
+
+    <!-- Barcode scanning library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
     
     <style>
         * {
@@ -1331,15 +1334,24 @@ ${itemList}
             if (settings.defaultMinStock) document.getElementById('defaultMinStock').value = settings.defaultMinStock;
         }
 
-        function testConnection() {
+        async function testConnection() {
             const gasUrl = document.getElementById('gasUrl').value;
             if (!gasUrl) {
                 alert('กรุณากรอก Google Apps Script URL');
                 return;
             }
-            
-            // จำลองการทดสอบการเชื่อมต่อ
-            alert('การเชื่อมต่อสำเร็จ');
+
+            try {
+                await fetch(gasUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'ping' })
+                });
+                alert('การเชื่อมต่อสำเร็จ');
+            } catch (error) {
+                alert('การเชื่อมต่อล้มเหลว');
+                console.error(error);
+            }
         }
 
         // === Google Apps Script Integration ===
@@ -1349,26 +1361,51 @@ ${itemList}
                 console.log('No Google Apps Script URL configured');
                 return;
             }
-            
-            // ส่งข้อมูลไป Google Sheets
+
             const data = {
                 action: 'sync',
+                sheetId: settings.sheetId,
                 inventory: inventory,
                 sales: sales
             };
-            
+
             fetch(settings.gasUrl, {
                 method: 'POST',
-                mode: 'no-cors',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)
-            }).then(() => {
+            })
+            .then(res => res.text())
+            .then(() => {
                 console.log('Synced with Google Sheets');
-            }).catch(error => {
+            })
+            .catch(error => {
                 console.error('Sync failed:', error);
             });
+        }
+
+        async function loadDataFromGoogleSheets() {
+            if (!settings.gasUrl || !settings.sheetId) {
+                return;
+            }
+
+            try {
+                const response = await fetch(settings.gasUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'getData', sheetId: settings.sheetId })
+                });
+                const data = await response.json();
+                if (data.inventory) {
+                    inventory = data.inventory;
+                    localStorage.setItem('pos_inventory', JSON.stringify(inventory));
+                }
+                if (data.sales) {
+                    sales = data.sales;
+                    localStorage.setItem('pos_sales', JSON.stringify(sales));
+                }
+            } catch (error) {
+                console.error('Load failed:', error);
+            }
         }
 
         // Auto-sync ทุก 5 นาที
@@ -1376,8 +1413,9 @@ ${itemList}
 
         // === เริ่มต้นระบบ ===
         
-        function initializeSystem() {
+        async function initializeSystem() {
             loadSettings();
+            await loadDataFromGoogleSheets();
             loadProductsForSell();
             loadReports();
             
@@ -1451,57 +1489,78 @@ ${itemList}
         // เพิ่มข้อมูลตัวอย่างหากยังไม่มี
         loadSampleData();
 
-        // === Camera Scanner (Optional Enhancement) ===
-        
-        let cameraStream = null;
-        
+        // === Camera Scanner ===
+
+        let scannerActive = false;
+
         function startBarcodeScanner() {
-            if (!navigator.mediaDevices) {
-                alert('เบราว์เซอร์ไม่รองรับการใช้กล้อง');
+            if (scannerActive) return;
+            if (!navigator.mediaDevices || typeof Quagga === 'undefined') {
+                alert('เบราว์เซอร์ไม่รองรับการใช้กล้องหรือสแกนเนอร์');
                 return;
             }
-            
+
+            scannerActive = true;
+
             const scannerContainer = document.createElement('div');
             scannerContainer.className = 'scanner-container';
             scannerContainer.innerHTML = `
                 <h4>📷 สแกนบาร์โค้ด</h4>
-                <video id="scannerVideo" width="300" height="200" autoplay></video>
+                <div id="scannerViewport" style="width: 100%; max-width: 400px; margin: auto;"></div>
                 <br>
                 <button class="btn btn-danger" onclick="stopBarcodeScanner()">หยุดสแกน</button>
             `;
-            
+
             document.querySelector('.tab-content.active').appendChild(scannerContainer);
-            
-            navigator.mediaDevices.getUserMedia({ 
-                video: { 
-                    facingMode: 'environment' // ใช้กล้องหลัง
-                } 
-            })
-            .then(stream => {
-                cameraStream = stream;
-                document.getElementById('scannerVideo').srcObject = stream;
-                
-                // จำลองการสแกน (ในการใช้งานจริงควรใช้ library อย่าง QuaggaJS)
-                setTimeout(() => {
-                    const mockBarcode = '8850006111101'; // ข้อมูลจำลอง
-                    document.getElementById('searchProduct').value = mockBarcode;
-                    document.getElementById('searchProduct').dispatchEvent(new Event('input'));
+
+            Quagga.init({
+                inputStream: {
+                    name: "Live",
+                    type: "LiveStream",
+                    target: document.getElementById('scannerViewport'),
+                    constraints: {
+                        facingMode: "environment"
+                    }
+                },
+                decoder: {
+                    readers: [
+                        "code_128_reader",
+                        "ean_reader",
+                        "ean_8_reader",
+                        "code_39_reader",
+                        "upc_reader",
+                        "upc_e_reader",
+                        "codabar_reader"
+                    ]
+                }
+            }, function(err) {
+                if (err) {
+                    console.error(err);
+                    alert('ไม่สามารถเริ่มสแกนได้');
                     stopBarcodeScanner();
-                    alert('สแกนบาร์โค้ดสำเร็จ: ' + mockBarcode);
-                }, 3000);
-            })
-            .catch(error => {
-                console.error('Camera access denied:', error);
-                alert('ไม่สามารถเข้าถึงกล้องได้');
+                    return;
+                }
+                Quagga.start();
             });
+
+            Quagga.onDetected(onBarcodeDetected);
         }
-        
+
+        function onBarcodeDetected(result) {
+            if (!result || !result.codeResult || !result.codeResult.code) return;
+            const code = result.codeResult.code;
+            document.getElementById('searchProduct').value = code;
+            document.getElementById('searchProduct').dispatchEvent(new Event('input'));
+            stopBarcodeScanner();
+        }
+
         function stopBarcodeScanner() {
-            if (cameraStream) {
-                cameraStream.getTracks().forEach(track => track.stop());
-                cameraStream = null;
+            if (scannerActive && typeof Quagga !== 'undefined') {
+                Quagga.stop();
+                Quagga.offDetected(onBarcodeDetected);
             }
-            
+            scannerActive = false;
+
             const scannerContainer = document.querySelector('.scanner-container');
             if (scannerContainer) {
                 scannerContainer.remove();
@@ -1667,8 +1726,8 @@ ${itemList}
         });
 
         // เริ่มต้นระบบเมื่อโหลดหน้าเว็บ
-        document.addEventListener('DOMContentLoaded', function() {
-            initializeSystem();
+        document.addEventListener('DOMContentLoaded', async function() {
+            await initializeSystem();
             
             // แสดงคำแนะนำการใช้งานครั้งแรก
             const firstTime = localStorage.getItem('pos_first_time');
