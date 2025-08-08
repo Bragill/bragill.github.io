@@ -7,7 +7,7 @@
     <meta name="description" content="ระบบ POS ครบครัน พร้อม PWA และ Google Sheets">
     
     <!-- PWA Manifest -->
-    <link rel="manifest" href="data:application/json;base64,eyJuYW1lIjoiUE9TIFN5c3RlbSIsInNob3J0X25hbWUiOiJQT1MiLCJzdGFydF91cmwiOiIuLyIsImRpc3BsYXkiOiJzdGFuZGFsb25lIiwiYmFja2dyb3VuZF9jb2xvciI6IiNmZmZmZmYiLCJ0aGVtZV9jb2xvciI6IiMzYjgyZjYiLCJpY29ucyI6W3sic3JjIjoiZGF0YTppbWFnZS9zdmcreG1sO2Jhc2U2NCxQSE4yWnlCM2FXUjBhRDBpTWpRaUlHaGxhV2RvZEQwaU1qUWlJSFpwWlhkQ2IzZzlJakFnTUNBeU5DQXlOQ0lnWm1sc2JEMGlJek5pT0RKbU5pSWdlRzFzYm5NOUltaDBkSEE2THk5M2QzY3Vkek11YjNKbkx6SXdNREF2YzNabklqNDhhbkpsWTNRZ2VEMGlOaUlnZVQwaU5pSWdkMmxrZEdnOUlqRXlJaUJvWldsbmFIUTlJakV5SWlCeWVEMGlNaUlnWm1sc2JEMGlJM1ptWmlJdlBqeDBaWGgwSUhnOUlqRXlJaUI1UFNJeE5TSWdabWxzYkQwaUl6TmlPREptTmlJZ1ptOXVkQzF6YVhwbFBTSTJJaUIwWlhoMExXRnVZMmh2Y2owaWJXbGtaR3hsSWo1UVQxTThMM1JsZUhRK1BEWHNMM04yWno0PSIsInNpemVzIjoiMjR4MjQiLCJ0eXBlIjoiaW1hZ2Uvc3ZnK3htbCJ9XX0=">
+    <link rel="manifest" href="/manifest.json">
     
     <!-- iOS PWA -->
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -644,7 +644,7 @@
 
         // PWA Service Worker
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('data:application/javascript;base64,c2VsZi5hZGRFdmVudExpc3RlbmVyKCdpbnN0YWxsJywgZXZlbnQgPT4gewogIGNvbnNvbGUubG9nKCdTVzogSW5zdGFsbGVkJyk7Cn0pOwoKc2VsZi5hZGRFdmVudExpc3RlbmVyKCdhY3RpdmF0ZScsIGV2ZW50ID0+IHsKICBjb25zb2xlLmxvZygnU1c6IEFjdGl2YXRlZCcpOwp9KTs=')
+            navigator.serviceWorker.register('sw.js')
                 .then(registration => console.log('SW registered'))
                 .catch(error => console.log('SW registration failed'));
         }
