@@ -1,0 +1,7 @@
+body { font-family: sans-serif; margin: 0; }
+header { background: #4a90e2; color: #fff; padding: 1rem; }
+nav button { margin-right: .5rem; }
+.view { padding: 1rem; }
+.hidden { display: none; }
+form input { margin-right: .5rem; }
+li.low { color: red; }

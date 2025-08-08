@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>POS PWA</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="stylesheet" href="styles/style.css">
+    <script defer src="scripts/app.js"></script>
+</head>
+<body>
+    <header>
+        <h1>POS System</h1>
+        <nav>
+            <button data-view="inventory">Inventory</button>
+            <button data-view="sales">Sales</button>
+            <button data-view="reports">Reports</button>
+            <button data-view="debts">Debts</button>
+        </nav>
+    </header>
+
+    <main>
+        <section id="inventory" class="view">
+            <h2>Inventory</h2>
+            <form id="add-item-form">
+                <input type="text" id="item-barcode" placeholder="Barcode">
+                <input type="text" id="item-name" placeholder="Name">
+                <input type="number" id="item-qty" placeholder="Quantity">
+                <input type="number" id="item-cost" placeholder="Cost">
+                <button type="submit">Add/Update</button>
+            </form>
+            <ul id="inventory-list"></ul>
+        </section>
+
+        <section id="sales" class="view hidden">
+            <h2>Sales</h2>
+            <form id="sale-form">
+                <input type="text" id="sale-barcode" placeholder="Scan barcode">
+                <input type="number" id="sale-qty" placeholder="Qty">
+                <button type="button" id="add-sale-item">Add to cart</button>
+            </form>
+            <ul id="cart-list"></ul>
+            <div id="sale-total"></div>
+            <button id="complete-sale">Complete Sale</button>
+            <div id="promptpay"></div>
+        </section>
+
+        <section id="reports" class="view hidden">
+            <h2>Reports</h2>
+            <div>
+                <label>Start: <input type="date" id="report-start"></label>
+                <label>End: <input type="date" id="report-end"></label>
+                <button id="run-report">Run</button>
+            </div>
+            <pre id="report-output"></pre>
+        </section>
+
+        <section id="debts" class="view hidden">
+            <h2>Debts</h2>
+            <form id="debt-form">
+                <input type="text" id="debt-customer" placeholder="Customer">
+                <input type="number" id="debt-amount" placeholder="Amount">
+                <button type="submit">Add Debt</button>
+            </form>
+            <ul id="debt-list"></ul>
+        </section>
+    </main>
+</body>
+</html>
