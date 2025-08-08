@@ -802,20 +802,37 @@
                 alert('ตะกร้าสินค้าว่าง');
                 return;
             }
-            
-            const received = parseFloat(document.getElementById('receivedAmount').value) || 0;
+
+            const receivedField = document.getElementById('receivedAmount');
+            const receivedStr = receivedField.value.trim();
             const total = cart.reduce((sum, item) => sum + (item.sellPrice * item.quantity), 0);
-            
+
+            if (receivedStr === '') {
+                const sale = {
+                    id: Date.now(),
+                    date: new Date().toISOString(),
+                    items: [...cart],
+                    total: total,
+                    received: 0,
+                    change: total,
+                    profit: cart.reduce((sum, item) => sum + ((item.sellPrice - item.costPrice) * item.quantity), 0)
+                };
+                showInvoice(sale);
+                return;
+            }
+
+            const received = parseFloat(receivedStr) || 0;
+
             if (received < total) {
                 alert('เงินที่รับไม่เพียงพอ');
                 return;
             }
-            
+
             // ลดสต๊อก
             cart.forEach(cartItem => {
                 inventory[cartItem.productIndex].quantity -= cartItem.quantity;
             });
-            
+
             // บันทึกการขาย
             const sale = {
                 id: Date.now(),
@@ -826,16 +843,16 @@
                 change: received - total,
                 profit: cart.reduce((sum, item) => sum + ((item.sellPrice - item.costPrice) * item.quantity), 0)
             };
-            
+
             sales.push(sale);
-            
+
             // บันทึกข้อมูล
             localStorage.setItem('pos_inventory', JSON.stringify(inventory));
             localStorage.setItem('pos_sales', JSON.stringify(sales));
-            
+
             // แสดงใบเสนอราคา
             showInvoice(sale);
-            
+
             // ล้างตะกร้า
             clearCart();
             loadProductsForSell(); // อัพเดตรายการสินค้า
@@ -846,7 +863,7 @@
             const modal = document.getElementById('invoiceModal');
             const invoiceContent = document.getElementById('invoiceContent');
             const storeName = settings.storeName || 'ร้านค้าของฉัน';
-            
+
             let itemsHtml = '';
             sale.items.forEach(item => {
                 const itemTotal = item.sellPrice * item.quantity;
@@ -857,12 +874,26 @@
                     </div>
                 `;
             });
-            
+
+            const paymentHtml = sale.received < sale.total
+                ? `<div class="invoice-item">
+                        <span>ยอดค้างชำระ</span>
+                        <span>฿${(sale.total - sale.received).toLocaleString()}</span>
+                   </div>`
+                : `<div class="invoice-item">
+                        <span>รับเงิน</span>
+                        <span>฿${sale.received.toLocaleString()}</span>
+                   </div>
+                   <div class="invoice-item">
+                        <span>เงินทอน</span>
+                        <span>฿${sale.change.toLocaleString()}</span>
+                   </div>`;
+
             invoiceContent.innerHTML = `
                 <div class="invoice">
                     <div class="invoice-header">
                         <h2>${storeName}</h2>
-                        <p>ใบเสนอราคา #${sale.id}</p>
+                        <p>${sale.received < sale.total ? 'ใบ PR' : 'ใบเสนอราคา'} #${sale.id}</p>
                         <p>${new Date(sale.date).toLocaleString('th-TH')}</p>
                     </div>
                     ${itemsHtml}
@@ -870,14 +901,7 @@
                         <span>รวมทั้งหมด</span>
                         <span>฿${sale.total.toLocaleString()}</span>
                     </div>
-                    <div class="invoice-item">
-                        <span>รับเงิน</span>
-                        <span>฿${sale.received.toLocaleString()}</span>
-                    </div>
-                    <div class="invoice-item">
-                        <span>เงินทอน</span>
-                        <span>฿${sale.change.toLocaleString()}</span>
-                    </div>
+                    ${paymentHtml}
                 </div>
             `;
             
