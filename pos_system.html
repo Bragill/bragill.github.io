@@ -379,6 +379,12 @@
         .hidden {
             display: none !important;
         }
+
+        .last-save {
+            text-align: center;
+            margin: 20px 0;
+            color: #fff;
+        }
     </style>
 </head>
 <body>
@@ -612,6 +618,8 @@
             </div>
         </div>
     </div>
+
+    <div id="lastSaved" class="last-save"></div>
 
     <!-- Modal สำหรับใบเสนอราคา -->
     <div id="invoiceModal" class="modal">
@@ -1679,7 +1687,7 @@ ${itemList}
 
 ⌨️ คีย์ลัด:
 F1 = ขายสินค้า
-F2 = รับสินค้า  
+F2 = รับสินค้า
 F3 = สินค้าคงคลัง
 F4 = รายงาน
 
@@ -1688,6 +1696,8 @@ F4 = รายงาน
                     localStorage.setItem('pos_first_time', 'true');
                 }, 1000);
             }
+
+            updateLastSaveDisplay();
         });
 
         // === Offline Support ===
@@ -1711,7 +1721,7 @@ F4 = รายงาน
         
         window.addEventListener('offline', function() {
             console.log('ออฟไลน์ - ข้อมูลจะถูกบันทึกใน Local Storage');
-            
+
             const notification = document.createElement('div');
             notification.className = 'alert alert-warning';
             notification.textContent = '🟡 ออฟไลน์ - ข้อมูลบันทึกในเครื่อง';
@@ -1719,19 +1729,29 @@ F4 = รายงาน
             notification.style.top = '20px';
             notification.style.right = '20px';
             notification.style.zIndex = '1000';
-            
+
             document.body.appendChild(notification);
             setTimeout(() => notification.remove(), 3000);
         });
 
         // === Auto-save ===
-        
+
         // บันทึกข้อมูลอัตโนมัติทุกครั้งที่มีการเปลี่ยนแปลง
+        function updateLastSaveDisplay() {
+            const last = localStorage.getItem('pos_last_save');
+            const el = document.getElementById('lastSaved');
+            if (el) {
+                el.textContent = last ? `🕒 บันทึกล่าสุด: ${new Date(last).toLocaleString()}` : '';
+            }
+        }
+
         function autoSave() {
             localStorage.setItem('pos_inventory', JSON.stringify(inventory));
             localStorage.setItem('pos_sales', JSON.stringify(sales));
             localStorage.setItem('pos_settings', JSON.stringify(settings));
-            localStorage.setItem('pos_last_save', new Date().toISOString());
+            const now = new Date().toISOString();
+            localStorage.setItem('pos_last_save', now);
+            updateLastSaveDisplay();
         }
 
         // เรียก autoSave หลังจากทุกการดำเนินการสำคัญ
