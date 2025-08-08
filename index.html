@@ -632,6 +632,9 @@
     <!-- html2canvas for invoice download -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
+    <!-- html5-qrcode for barcode scanning -->
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/dist/html5-qrcode.min.js"></script>
+
     <script>
         // ข้อมูลสำหรับจำลอง (ในการใช้งานจริงจะเชื่อมกับ Google Sheets)
         let inventory = JSON.parse(localStorage.getItem('pos_inventory') || '[]');
@@ -1451,57 +1454,50 @@ ${itemList}
         // เพิ่มข้อมูลตัวอย่างหากยังไม่มี
         loadSampleData();
 
-        // === Camera Scanner (Optional Enhancement) ===
-        
-        let cameraStream = null;
-        
+        // === Camera Barcode Scanner ===
+
+        let barcodeScanner = null;
+
         function startBarcodeScanner() {
-            if (!navigator.mediaDevices) {
-                alert('เบราว์เซอร์ไม่รองรับการใช้กล้อง');
-                return;
-            }
-            
             const scannerContainer = document.createElement('div');
             scannerContainer.className = 'scanner-container';
             scannerContainer.innerHTML = `
                 <h4>📷 สแกนบาร์โค้ด</h4>
-                <video id="scannerVideo" width="300" height="200" autoplay></video>
+                <div id="scannerReader" style="width:300px"></div>
                 <br>
                 <button class="btn btn-danger" onclick="stopBarcodeScanner()">หยุดสแกน</button>
             `;
-            
+
             document.querySelector('.tab-content.active').appendChild(scannerContainer);
-            
-            navigator.mediaDevices.getUserMedia({ 
-                video: { 
-                    facingMode: 'environment' // ใช้กล้องหลัง
-                } 
-            })
-            .then(stream => {
-                cameraStream = stream;
-                document.getElementById('scannerVideo').srcObject = stream;
-                
-                // จำลองการสแกน (ในการใช้งานจริงควรใช้ library อย่าง QuaggaJS)
-                setTimeout(() => {
-                    const mockBarcode = '8850006111101'; // ข้อมูลจำลอง
-                    document.getElementById('searchProduct').value = mockBarcode;
+
+            barcodeScanner = new Html5Qrcode('scannerReader');
+            barcodeScanner.start(
+                { facingMode: 'environment' },
+                { fps: 10, qrbox: 250 },
+                barcode => {
+                    document.getElementById('searchProduct').value = barcode;
                     document.getElementById('searchProduct').dispatchEvent(new Event('input'));
                     stopBarcodeScanner();
-                    alert('สแกนบาร์โค้ดสำเร็จ: ' + mockBarcode);
-                }, 3000);
-            })
-            .catch(error => {
+                    alert('สแกนบาร์โค้ดสำเร็จ: ' + barcode);
+                },
+                errorMessage => {
+                    console.warn('Barcode scan error:', errorMessage);
+                }
+            ).catch(error => {
                 console.error('Camera access denied:', error);
                 alert('ไม่สามารถเข้าถึงกล้องได้');
+                stopBarcodeScanner();
             });
         }
-        
+
         function stopBarcodeScanner() {
-            if (cameraStream) {
-                cameraStream.getTracks().forEach(track => track.stop());
-                cameraStream = null;
+            if (barcodeScanner) {
+                barcodeScanner.stop().then(() => {
+                    barcodeScanner.clear();
+                    barcodeScanner = null;
+                }).catch(err => console.error('Failed to stop scanner', err));
             }
-            
+
             const scannerContainer = document.querySelector('.scanner-container');
             if (scannerContainer) {
                 scannerContainer.remove();
